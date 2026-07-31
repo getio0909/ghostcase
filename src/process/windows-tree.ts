@@ -214,7 +214,7 @@ public static class GhostCaseProcessTree
                     }
 
                     var handle = OpenProcess(
-                        PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
+                        PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
                         false,
                         child.Pid);
                     if (handle == IntPtr.Zero)
@@ -232,8 +232,13 @@ public static class GhostCaseProcessTree
                     FILETIME user;
                     if (!GetProcessTimes(handle, out creation, out exit, out kernel, out user))
                     {
+                        var exitedNaturally =
+                            WaitForSingleObject(handle, 0) == WAIT_OBJECT_0;
                         CloseHandle(handle);
-                        identityFailed = true;
+                        if (!exitedNaturally)
+                        {
+                            identityFailed = true;
+                        }
                         continue;
                     }
                     var created = ToLong(creation);
@@ -285,18 +290,67 @@ public static class GhostCaseProcessTree
                 {
                     continue;
                 }
-                if (!TerminateProcess(candidate.Handle, 1))
+
+                var terminationHandle = OpenProcess(
+                    PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
+                    false,
+                    candidate.Pid);
+                if (terminationHandle == IntPtr.Zero)
                 {
-                    if (WaitForSingleObject(candidate.Handle, 1000) != WAIT_OBJECT_0)
+                    if (WaitForSingleObject(candidate.Handle, 0) != WAIT_OBJECT_0)
                     {
                         terminationFailed = true;
                     }
                     continue;
                 }
-                terminatedCount++;
-                if (WaitForSingleObject(candidate.Handle, 1000) != WAIT_OBJECT_0)
+                try
                 {
-                    terminationFailed = true;
+                    FILETIME creation;
+                    FILETIME exit;
+                    FILETIME kernel;
+                    FILETIME user;
+                    if (!GetProcessTimes(
+                        terminationHandle,
+                        out creation,
+                        out exit,
+                        out kernel,
+                        out user))
+                    {
+                        if (WaitForSingleObject(candidate.Handle, 0) != WAIT_OBJECT_0)
+                        {
+                            terminationFailed = true;
+                        }
+                        continue;
+                    }
+                    if (ToLong(creation) != candidate.CreationFileTime)
+                    {
+                        if (WaitForSingleObject(candidate.Handle, 0) != WAIT_OBJECT_0)
+                        {
+                            terminationFailed = true;
+                        }
+                        continue;
+                    }
+                    if (WaitForSingleObject(candidate.Handle, 0) == WAIT_OBJECT_0)
+                    {
+                        continue;
+                    }
+                    if (!TerminateProcess(terminationHandle, 1))
+                    {
+                        if (WaitForSingleObject(candidate.Handle, 1000) != WAIT_OBJECT_0)
+                        {
+                            terminationFailed = true;
+                        }
+                        continue;
+                    }
+                    terminatedCount++;
+                    if (WaitForSingleObject(candidate.Handle, 1000) != WAIT_OBJECT_0)
+                    {
+                        terminationFailed = true;
+                    }
+                }
+                finally
+                {
+                    CloseHandle(terminationHandle);
                 }
             }
 

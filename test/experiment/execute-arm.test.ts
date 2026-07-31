@@ -142,7 +142,9 @@ describe('executeArm', () => {
       victimCase: caseById(fixture.manifest, 'victim'),
     });
 
-    expect(result.status).toBe('valid');
+    if (result.status !== 'valid') {
+      throw new Error(JSON.stringify(result));
+    }
     expect(predecessorCases).toEqual([first, second]);
     expect(predecessorCases[0]).toBe(first);
     expect(predecessorCases[1]).toBe(second);

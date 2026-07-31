@@ -30,7 +30,7 @@ afterEach(async () => {
 
 describe('replayEvidence', () => {
   it('replays only the recorded witness with fresh and shared repetitions', async () => {
-    const fixture = await replayFixture();
+    const fixture = await replayFixture({ discoverFinding: true });
 
     const replay = await replayEvidence(fixture.evidencePath, {
       temporaryRoot: fixture.temporaryRoot,
@@ -109,6 +109,38 @@ describe('replayEvidence', () => {
     expect(replay.matched).toBe(false);
   }, 60_000);
 
+  it('does not match when the same state subject contains different bytes', async () => {
+    const fixture = await replayFixture({ discoverFinding: true });
+    const expectedChange = fixture.report.victims[0]?.stateChanges[0];
+    if (
+      expectedChange?.digest === undefined ||
+      expectedChange.size === undefined ||
+      expectedChange.kind !== 'added'
+    ) {
+      throw new Error('Replay fixture did not retain file content evidence.');
+    }
+    await writeFile(fixture.pollutionControlPath, '{"voice":"bishop"}', 'utf8');
+
+    const replay = await replayEvidence(fixture.evidencePath, {
+      temporaryRoot: fixture.temporaryRoot,
+    });
+    const actualChange = replay.report.victims[0]?.stateChanges[0];
+
+    expect(replay.report.victims[0]).toMatchObject({
+      minimalChain: ['polluter'],
+      verdict: 'POLLUTION',
+    });
+    expect(replay.matched).toBe(false);
+    expect(actualChange).toMatchObject({
+      alias: expectedChange.alias,
+      kind: expectedChange.kind,
+      size: expectedChange.size,
+      subjectId: expectedChange.subjectId,
+    });
+    expect(actualChange?.digest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(actualChange?.digest).not.toBe(expectedChange.digest);
+  }, 60_000);
+
   it('turns an aborted replay into harness evidence without leaking output or secrets', async () => {
     const fixture = await replayFixture();
     const controller = new AbortController();
@@ -153,7 +185,7 @@ describe('replayEvidence', () => {
   ])(
     'rejects a stale recorded case reference',
     async ({ chain, victimId }) => {
-      const fixture = await replayFixture({ useManualFinding: true });
+      const fixture = await replayFixture();
       const recorded = fixture.report.victims[0];
       if (recorded?.fresh.kind !== 'stable' || recorded.shared.kind !== 'stable') {
         throw new Error('Replay fixture did not produce stable evidence.');
@@ -195,7 +227,7 @@ describe('replayEvidence', () => {
   ])(
     'rejects a recorded chain containing $label',
     async ({ chain }) => {
-      const fixture = await replayFixture({ useManualFinding: true });
+      const fixture = await replayFixture();
       const report = pollutionReport(fixture.report, chain);
       const stored = await storeEvidence({
         evidenceDir: join(fixture.root, `invalid-order-${chain.join('-')}`),
@@ -220,7 +252,6 @@ describe('replayEvidence', () => {
           unsupportedRole === 'victim'
             ? { victim: [unsupportedPlatform] }
             : { polluter: [unsupportedPlatform] },
-        useManualFinding: true,
       });
       await writeFile(fixture.trackerPath, '', 'utf8');
 
@@ -248,7 +279,7 @@ describe('replayEvidence', () => {
   );
 
   it('does not execute and returns inconclusive on an unsupported host platform', async () => {
-    const fixture = await replayFixture({ useManualFinding: true });
+    const fixture = await replayFixture();
     await writeFile(fixture.trackerPath, '', 'utf8');
     const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform');
     if (platformDescriptor === undefined) {
@@ -283,6 +314,7 @@ interface ReplayFixture {
   readonly agentPath: string;
   readonly evidencePath: string;
   readonly manifest: LoadedManifest;
+  readonly pollutionControlPath: string;
   readonly prepared: PreparedSuite;
   readonly report: GhostCaseReport;
   readonly root: string;
@@ -291,8 +323,8 @@ interface ReplayFixture {
 }
 
 interface ReplayFixtureOptions {
+  readonly discoverFinding?: boolean;
   readonly platformOverrides?: Readonly<Record<string, readonly string[]>>;
-  readonly useManualFinding?: boolean;
 }
 
 async function replayFixture(options: ReplayFixtureOptions = {}): Promise<ReplayFixture> {
@@ -305,6 +337,7 @@ async function replayFixture(options: ReplayFixtureOptions = {}): Promise<Replay
 
   const agentPath = join(suiteDir, 'agent.mjs');
   const trackerPath = join(suiteDir, 'tracker.log');
+  const pollutionControlPath = `${trackerPath}.pollution`;
   const manifestPath = join(suiteDir, 'ghostcase.json');
   await writeFile(agentPath, agentSource({ victimAlwaysPasses: false }), 'utf8');
   await writeFile(
@@ -366,17 +399,17 @@ async function replayFixture(options: ReplayFixtureOptions = {}): Promise<Replay
   );
 
   const initial =
-    options.useManualFinding === true
-      ? undefined
-      : await runSuite({
+    options.discoverFinding === true
+      ? await runSuite({
           suitePath: manifestPath,
           temporaryRoot,
           victimIds: ['victim'],
-        });
+        })
+      : undefined;
   const manifest = initial?.manifest ?? (await loadManifest(manifestPath));
   const prepared = initial?.prepared ?? (await prepareSuite(manifest));
   const report = initial?.report ?? manualPollutionReport(manifest, ['polluter']);
-  if (!options.useManualFinding) {
+  if (options.discoverFinding === true) {
     expect(report.victims[0]).toMatchObject({
       minimalChain: ['polluter'],
       verdict: 'POLLUTION',
@@ -394,6 +427,7 @@ async function replayFixture(options: ReplayFixtureOptions = {}): Promise<Replay
     agentPath,
     evidencePath: stored.path,
     manifest,
+    pollutionControlPath,
     prepared,
     report,
     root,
@@ -486,10 +520,12 @@ function reportWithoutStateChanges(base: GhostCaseReport): GhostCaseReport {
 
 function agentSource(options: { readonly victimAlwaysPasses: boolean }): string {
   return [
-    "import { appendFileSync, existsSync, writeFileSync } from 'node:fs';",
+    "import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';",
     'const [tracker, action] = process.argv.slice(2);',
     'appendFileSync(tracker, `${action}\\n`);',
-    "if (action === 'polluter') writeFileSync('persona.json', '{\"voice\":\"pirate\"}');",
+    'const pollutionControl = `${tracker}.pollution`;',
+    'const pollution = existsSync(pollutionControl) ? readFileSync(pollutionControl, \'utf8\') : \'{"voice":"pirate"}\';',
+    "if (action === 'polluter') writeFileSync('persona.json', pollution);",
     options.victimAlwaysPasses
       ? 'const ok = true;'
       : "const ok = action !== 'victim' || !existsSync('persona.json');",

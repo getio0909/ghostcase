@@ -301,9 +301,11 @@ function toReplayVictim(
       ? undefined
       : `expected_${expected.verdict.toLowerCase()}_observed_${verdict.toLowerCase()}`;
   const stateChanges: readonly ReportStateChangeInput[] =
-    shared.representativeEvidence?.changes.map(({ alias, kind, subjectId }) => ({
+    shared.representativeEvidence?.changes.map(({ alias, digest, kind, size, subjectId }) => ({
       alias,
+      ...(digest === undefined ? {} : { digest }),
       kind,
+      ...(size === undefined ? {} : { size }),
       subjectId,
     })) ?? [];
   const input: GhostCaseVictimReportInput = {

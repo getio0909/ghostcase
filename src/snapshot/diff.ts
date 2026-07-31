@@ -4,7 +4,9 @@ export type FilesystemChangeKind = 'added' | 'modified' | 'removed' | 'type_chan
 
 export interface FilesystemChange {
   readonly alias: string;
+  readonly digest?: string;
   readonly kind: FilesystemChangeKind;
+  readonly size?: number;
   readonly subjectId: string;
 }
 
@@ -122,6 +124,7 @@ function indexEntries(
 function change(entry: FilesystemSnapshotEntry, kind: FilesystemChangeKind): FilesystemChange {
   return {
     alias: entry.alias,
+    ...(entry.kind === 'file' ? { digest: entry.contentDigest, size: entry.size } : {}),
     kind,
     subjectId: entry.subjectId,
   };

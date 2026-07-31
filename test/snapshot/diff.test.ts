@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { diffFilesystemSnapshots } from '../../src/snapshot/diff.js';
 import {
   captureFilesystemSnapshot,
+  type FilesystemDirectoryEntry,
+  type FilesystemFileEntry,
   type FilesystemSnapshot,
   type FilesystemSnapshotLimits,
 } from '../../src/snapshot/filesystem.js';
@@ -69,15 +71,27 @@ describe('diffFilesystemSnapshots', () => {
     expect(result.changes.every((change) => change.alias === 'state')).toBe(true);
     expect(result.changes.every((change) => /^[a-f\d]{64}$/u.test(change.subjectId))).toBe(true);
 
+    const expectedFileEntries = [
+      fileEntry(after, 'private-added.txt'),
+      fileEntry(after, 'private-modified.txt'),
+      fileEntry(before, 'private-removed.txt'),
+    ];
+    for (const entry of expectedFileEntries) {
+      expect(result.changes.find(({ subjectId }) => subjectId === entry.subjectId)).toMatchObject({
+        digest: entry.contentDigest,
+        size: entry.size,
+      });
+    }
+    expect(
+      result.changes.find(
+        ({ subjectId }) => subjectId === directoryEntry(after, 'private-shape').subjectId,
+      ),
+    ).not.toHaveProperty('digest');
+
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain('private-');
     expect(serialized).not.toContain('relativePath');
     expect(serialized).not.toContain('contentDigest');
-    for (const entry of [...before.entries, ...after.entries]) {
-      if (entry.kind === 'file') {
-        expect(serialized).not.toContain(entry.contentDigest);
-      }
-    }
   });
 
   it('does not report unchanged directories or equal file contents', async () => {
@@ -163,4 +177,23 @@ async function captureComplete(workspaceRoot: string): Promise<FilesystemSnapsho
     throw new Error(`Expected a complete snapshot, received ${result.error.code}`);
   }
   return result;
+}
+
+function fileEntry(snapshot: FilesystemSnapshot, relativePath: string): FilesystemFileEntry {
+  const entry = snapshot.entries.find((candidate) => candidate.relativePath === relativePath);
+  if (entry?.kind !== 'file') {
+    throw new Error(`Expected a file snapshot entry for ${relativePath}.`);
+  }
+  return entry;
+}
+
+function directoryEntry(
+  snapshot: FilesystemSnapshot,
+  relativePath: string,
+): FilesystemDirectoryEntry {
+  const entry = snapshot.entries.find((candidate) => candidate.relativePath === relativePath);
+  if (entry?.kind !== 'directory') {
+    throw new Error(`Expected a directory snapshot entry for ${relativePath}.`);
+  }
+  return entry;
 }

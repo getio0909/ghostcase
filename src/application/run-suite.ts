@@ -191,11 +191,15 @@ function toVictimReport(
     ...(reason === undefined ? {} : { reason }),
     shared: summarizeArm(diagnosis.shared),
     stateChanges:
-      diagnosis.representativeEvidence.shared?.changes.map(({ alias, kind, subjectId }) => ({
-        alias,
-        kind,
-        subjectId,
-      })) ?? [],
+      diagnosis.representativeEvidence.shared?.changes.map(
+        ({ alias, digest, kind, size, subjectId }) => ({
+          alias,
+          ...(digest === undefined ? {} : { digest }),
+          kind,
+          ...(size === undefined ? {} : { size }),
+          subjectId,
+        }),
+      ) ?? [],
     verdict: diagnosis.verdict,
   };
 }
