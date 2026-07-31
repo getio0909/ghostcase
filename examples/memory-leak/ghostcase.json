@@ -1,0 +1,91 @@
+{
+  "schema": "ghostcase/suite/v1",
+  "suite": {
+    "id": "memory-leak-demo",
+    "description": "A leaked persona makes a later agent evaluation observe the wrong memory.",
+    "repetitions": 2,
+    "search": {
+      "maxChainLength": 8,
+      "maxExperiments": 64
+    }
+  },
+  "stateRoots": [
+    {
+      "id": "memory",
+      "seed": {
+        "kind": "empty"
+      }
+    }
+  ],
+  "execution": {
+    "stepTimeoutMs": 5000,
+    "caseTimeoutMs": 10000,
+    "armTimeoutMs": 30000,
+    "suiteTimeoutMs": 120000,
+    "cleanupTimeoutMs": 10000,
+    "maxStdoutBytes": 65536,
+    "maxStderrBytes": 65536,
+    "maxStdinBytes": 65536,
+    "maxSnapshotEntries": 256,
+    "maxSnapshotFileBytes": 1048576,
+    "maxSnapshotBytes": 4194304
+  },
+  "adapter": {
+    "run": {
+      "program": {
+        "lookup": "node"
+      },
+      "argv": [
+        {
+          "path": {
+            "base": "suite",
+            "path": "agent.mjs"
+          }
+        }
+      ],
+      "cwd": {
+        "base": "state",
+        "root": "memory",
+        "path": "."
+      }
+    },
+    "oracle": {
+      "kind": "stdoutJsonPointerEquals",
+      "pointer": "/ok",
+      "equals": true
+    },
+    "snapshot": {
+      "roots": [
+        {
+          "root": "memory"
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "noise",
+      "description": "Warms an unrelated cache entry.",
+      "tags": ["control"],
+      "run": {
+        "argv": ["noise"]
+      }
+    },
+    {
+      "id": "polluter",
+      "description": "Leaks a pirate persona into persistent memory.",
+      "tags": ["memory-writer"],
+      "run": {
+        "argv": ["polluter"]
+      }
+    },
+    {
+      "id": "victim",
+      "description": "Must start with neutral memory.",
+      "tags": ["victim"],
+      "run": {
+        "argv": ["victim"]
+      }
+    }
+  ]
+}

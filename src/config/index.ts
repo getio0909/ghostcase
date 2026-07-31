@@ -1,0 +1,51 @@
+export {
+  DEFAULT_ENVIRONMENT,
+  DEFAULT_EXECUTION,
+  DEFAULT_SEARCH,
+  MANIFEST_FILE_MAX_BYTES,
+  MANIFEST_HARD_LIMITS,
+  loadManifest,
+  parseManifest,
+} from './load-manifest.js';
+export {
+  PORTABLE_PATH_LIMITS,
+  PortablePathError,
+  parsePortablePath,
+  resolvePortablePath,
+} from './portable-path.js';
+export {
+  STRICT_JSON_LIMITS,
+  StrictJsonError,
+  parseStrictJsonBytes,
+  type StrictJsonErrorCode,
+} from './strict-json.js';
+
+export type {
+  AdapterSpec,
+  CaseSpec,
+  CommandSpec,
+  CopySeedSpec,
+  EmptySeedSpec,
+  EnvironmentPatch,
+  EnvironmentSpec,
+  ExecutionSpec,
+  LoadedManifest,
+  ManifestDefinition,
+  PathReference,
+  PathValueSpec,
+  PlatformName,
+  PortablePath,
+  ProgramSpec,
+  ResolvedSeedSpec,
+  ResolvedStateRoot,
+  RunPatch,
+  SeedSpec,
+  SnapshotRootSpec,
+  SnapshotSpec,
+  StateRootSpec,
+  StdinSpec,
+  SuiteSearch,
+  SuiteSpec,
+  ValueSpec,
+  WorkingDirectorySpec,
+} from '../domain/model.js';
