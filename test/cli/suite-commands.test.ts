@@ -307,7 +307,10 @@ describe('runSuiteCommand', () => {
       'linked-stdin.json',
     );
 
-    await expectDoctorCause(manifestPath, 'not a permitted regular file');
+    await expectDoctorCause(
+      manifestPath,
+      'A command stdin file is not a permitted regular non-link file.',
+    );
   });
 
   it('rejects stdin that escapes its typed suite root through a linked directory', async () => {

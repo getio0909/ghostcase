@@ -212,7 +212,7 @@ describe('resolveCommand', () => {
           environment,
           context,
         ),
-      ).rejects.toThrow('regular file');
+      ).rejects.toThrow('A command stdin file is not a permitted regular non-link file.');
     } catch (error) {
       if (
         process.platform !== 'win32' ||
