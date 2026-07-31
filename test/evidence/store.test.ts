@@ -1,5 +1,14 @@
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -48,12 +57,13 @@ describe('evidence storage', () => {
     });
     const bytes = await readFile(first.path);
     const expectedDigest = createHash('sha256').update(bytes).digest('hex');
+    const canonicalEvidenceDir = await realpath(fixture.evidenceDir);
 
     expect(second.path).toBe(first.path);
     expect(second.sha256).toBe(first.sha256);
     expect(first.sha256).toBe(expectedDigest);
     expect(first.path).toBe(
-      join(fixture.evidenceDir, `evidence-suite-${expectedDigest.slice(0, 12)}.json`),
+      join(canonicalEvidenceDir, `evidence-suite-${expectedDigest.slice(0, 12)}.json`),
     );
     expect(bytes.toString('utf8')).toBe(
       canonicalJson(first.evidence as unknown as CanonicalJsonValue),

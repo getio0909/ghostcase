@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -456,7 +456,7 @@ function recordAt(value: unknown, index: number): Record<string, unknown> {
 }
 
 describe('loadManifest', () => {
-  it('loads a stable regular file, hashes its exact bytes, and resolves seed paths lexically', async () => {
+  it('loads a stable regular file, hashes its exact bytes, and canonicalizes suite paths', async () => {
     const directory = await temporaryDirectory();
     const sourcePath = join(directory, 'nested', 'suite.json');
     const input = minimalManifest();
@@ -465,18 +465,20 @@ describe('loadManifest', () => {
     await writeFile(sourcePath, source, 'utf8');
 
     const loaded = await loadManifest(sourcePath);
+    const canonicalSourcePath = await realpath(sourcePath);
+    const canonicalSuiteDir = dirname(canonicalSourcePath);
 
     expect(loaded).toMatchObject({
-      sourcePath: resolve(sourcePath),
+      sourcePath: canonicalSourcePath,
       sourceSha256: createHash('sha256').update(source, 'utf8').digest('hex'),
-      suiteDir: resolve(directory, 'nested'),
+      suiteDir: canonicalSuiteDir,
       stateRoots: [
         {
           id: 'workspace',
           seed: {
             kind: 'copy',
             path: 'fixtures/workspace',
-            resolvedPath: resolve(directory, 'nested', 'fixtures', 'workspace'),
+            resolvedPath: resolve(canonicalSuiteDir, 'fixtures', 'workspace'),
           },
         },
         {

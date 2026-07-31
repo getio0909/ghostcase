@@ -35,6 +35,7 @@ import {
   type JsonValue,
   type OracleSpec,
 } from '../oracle/index.js';
+import { isLinkFreePath } from '../platform/path-safety.js';
 import { parsePortablePath, resolvePortablePath } from './portable-path.js';
 import { parseStrictJsonBytes, StrictJsonError } from './strict-json.js';
 
@@ -182,8 +183,8 @@ export async function loadManifest(manifestPath: string): Promise<LoadedManifest
     throw new ConfigError('Manifest file path contains a NUL byte.');
   }
 
-  const sourcePath = resolve(manifestPath);
-  const bytes = await readManifestFile(sourcePath);
+  const requestedSourcePath = resolve(manifestPath);
+  const { bytes, canonicalPath: sourcePath } = await readManifestFile(requestedSourcePath);
   let parsed: unknown;
   try {
     parsed = parseStrictJsonBytes(bytes);
@@ -1217,7 +1218,9 @@ function parseJsonPointer(value: unknown, jsonPath: string): string {
   return pointer;
 }
 
-async function readManifestFile(sourcePath: string): Promise<Uint8Array> {
+async function readManifestFile(
+  sourcePath: string,
+): Promise<{ readonly bytes: Uint8Array; readonly canonicalPath: string }> {
   let before: BigIntStats;
   let canonical: string;
   try {
@@ -1231,7 +1234,11 @@ async function readManifestFile(sourcePath: string): Promise<Uint8Array> {
       },
     );
   }
-  if (!before.isFile() || before.isSymbolicLink() || !samePath(sourcePath, canonical)) {
+  if (
+    !before.isFile() ||
+    before.isSymbolicLink() ||
+    !(await isLinkFreePath(sourcePath, canonical))
+  ) {
     throw new ConfigError(`Manifest path '${sourcePath}' must be a regular non-link file.`);
   }
   if (before.size > BigInt(MANIFEST_FILE_MAX_BYTES)) {
@@ -1256,7 +1263,7 @@ async function readManifestFile(sourcePath: string): Promise<Uint8Array> {
     ) {
       throw new ConfigError(`Manifest file '${sourcePath}' changed while it was read.`);
     }
-    return bytes;
+    return { bytes, canonicalPath: canonical };
   } catch (error) {
     if (error instanceof ConfigError) {
       throw error;
@@ -1301,10 +1308,6 @@ function sameFileSnapshot(left: BigIntStats, right: BigIntStats): boolean {
     right.isFile() &&
     !right.isSymbolicLink()
   );
-}
-
-function samePath(left: string, right: string): boolean {
-  return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
 function parseId(value: unknown, jsonPath: string): string {

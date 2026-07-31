@@ -14,6 +14,7 @@ import type {
   ValueSpec,
   WorkingDirectorySpec,
 } from '../domain/model.js';
+import { isLinkFreePath } from '../platform/path-safety.js';
 import { resolvePortablePath } from '../config/portable-path.js';
 
 const WINDOWS_COMMAND_LINE_LIMIT = 30_000;
@@ -250,7 +251,8 @@ async function validateExecutable(candidate: string, allowLink: boolean): Promis
   }
   if (
     !canonicalMetadata.isFile() ||
-    (!allowLink && (lexicalMetadata.isSymbolicLink() || !samePath(candidate, canonical)))
+    (!allowLink &&
+      (lexicalMetadata.isSymbolicLink() || !(await isLinkFreePath(candidate, canonical))))
   ) {
     throw new HarnessError('An executable is not a permitted regular file.');
   }
@@ -283,16 +285,25 @@ async function resolveWorkingDirectory(
   const candidate = resolvePortablePath(base, location.path);
   let metadata;
   let canonical;
+  let canonicalArmRoot;
   try {
     metadata = await lstat(candidate);
-    canonical = await realpath(candidate);
+    [canonical, canonicalArmRoot] = await Promise.all([
+      realpath(candidate),
+      realpath(context.armRoot),
+    ]);
   } catch (error) {
     throw new HarnessError('A command working directory is unavailable.', { cause: error });
   }
-  if (!metadata.isDirectory() || metadata.isSymbolicLink() || !samePath(candidate, canonical)) {
+  if (
+    !metadata.isDirectory() ||
+    metadata.isSymbolicLink() ||
+    !(await isLinkFreePath(candidate, canonical)) ||
+    !(await isLinkFreePath(context.armRoot, canonicalArmRoot))
+  ) {
     throw new HarnessError('A command working directory is not a regular isolated directory.');
   }
-  if (!isWithin(context.armRoot, canonical)) {
+  if (!isWithin(canonicalArmRoot, canonical)) {
     throw new HarnessError('A command working directory escaped its isolated arm.');
   }
   return canonical;
@@ -412,7 +423,7 @@ async function inspectStdin(
   if (!isWithin(canonicalRoot, canonicalFile)) {
     throw new HarnessError('A command stdin file escaped its declared typed-path root.');
   }
-  if (!samePath(location.filename, canonicalFile)) {
+  if (!(await isLinkFreePath(location.filename, canonicalFile))) {
     throw new HarnessError('A command stdin file is not a permitted regular non-link file.');
   }
   const canonicalMetadata = await safeBigIntLstat(canonicalFile);
@@ -559,10 +570,6 @@ function unquotePathEntry(value: string): string {
 function isWithin(root: string, candidate: string): boolean {
   const child = relative(root, candidate);
   return child === '' || (!child.startsWith('..') && !isAbsolute(child));
-}
-
-function samePath(left: string, right: string): boolean {
-  return pathKey(left) === pathKey(right);
 }
 
 function pathKey(path: string): string {

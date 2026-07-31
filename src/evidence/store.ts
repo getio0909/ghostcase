@@ -7,6 +7,7 @@ import { canonicalJson, type CanonicalJsonValue } from '../canonical/index.js';
 import { loadManifest, parseStrictJsonBytes } from '../config/index.js';
 import { errorMessage, EvidenceError, isNodeError } from '../domain/errors.js';
 import type { LoadedManifest } from '../domain/model.js';
+import { isLinkFreePath } from '../platform/path-safety.js';
 import { validateReport, type GhostCaseReport } from '../report/index.js';
 import { prepareSuite, type PreparedSuite } from '../workspace/index.js';
 import {
@@ -238,7 +239,7 @@ async function prepareEvidenceDirectory(requestedPath: string): Promise<string> 
       throw new EvidenceError('Evidence directory must be a real directory, not a link.');
     }
     const canonical = await realpath(absolutePath);
-    if (!samePath(absolutePath, canonical)) {
+    if (!(await isLinkFreePath(absolutePath, canonical))) {
       throw new EvidenceError('Evidence directory must not be a symbolic link.');
     }
     const after = await lstat(absolutePath, { bigint: true });
@@ -355,7 +356,11 @@ async function readEvidenceFile(requestedPath: string): Promise<ReadEvidenceFile
       cause: error,
     });
   }
-  if (!before.isFile() || before.isSymbolicLink() || !samePath(sourcePath, canonical)) {
+  if (
+    !before.isFile() ||
+    before.isSymbolicLink() ||
+    !(await isLinkFreePath(sourcePath, canonical))
+  ) {
     throw new EvidenceError('Evidence path must be a regular non-link file.');
   }
   if (before.size > BigInt(EVIDENCE_FILE_MAX_BYTES)) {
@@ -499,8 +504,4 @@ function fileHandleAdapter(handle: FileHandle): EvidenceWriteHandle {
     sync: async (): Promise<void> => handle.sync(),
     writeFile: async (bytes: Buffer): Promise<void> => handle.writeFile(bytes),
   };
-}
-
-function samePath(left: string, right: string): boolean {
-  return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 }

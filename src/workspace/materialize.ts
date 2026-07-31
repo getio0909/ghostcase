@@ -3,6 +3,7 @@ import { chmod, lstat, mkdir, mkdtemp, open, realpath, rm } from 'node:fs/promis
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { FixtureError, HarnessError, isNodeError } from '../domain/errors.js';
+import { isLinkFreePath } from '../platform/path-safety.js';
 import type { SeedEntry, SeedFile, SeedSnapshot } from './seed.js';
 
 export interface MaterializeOptions {
@@ -116,7 +117,7 @@ async function validateTemporaryRoot(root: string): Promise<string> {
   } catch (error) {
     throw new HarnessError('Unable to resolve the temporary workspace root.', { cause: error });
   }
-  if (!samePath(lexical, canonical)) {
+  if (!(await isLinkFreePath(lexical, canonical))) {
     throw new HarnessError('The temporary workspace root resolves through a link.');
   }
   return canonical;
@@ -166,7 +167,7 @@ async function removeWorkspace(path: string, temporaryRoot: string, prefix: stri
       cause: error,
     });
   }
-  if (!samePath(path, canonical)) {
+  if (!(await isLinkFreePath(path, canonical))) {
     throw new HarnessError('Refusing to clean an isolated workspace that became a link.');
   }
   try {

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { win32 } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
 
@@ -753,6 +754,7 @@ async function getWindowsTreeHelper(): Promise<WindowsTreeHelper> {
 
 function spawnHelper(): HelperChild {
   const windowsDirectory = process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows';
+  const temporaryDirectory = win32.resolve(tmpdir());
   const executable = win32.join(
     windowsDirectory,
     'System32',
@@ -767,6 +769,8 @@ function spawnHelper(): HelperChild {
       cwd: windowsDirectory,
       env: {
         SystemRoot: windowsDirectory,
+        TEMP: temporaryDirectory,
+        TMP: temporaryDirectory,
         WINDIR: windowsDirectory,
       },
       shell: false,

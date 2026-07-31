@@ -16,6 +16,7 @@ import type {
   ValueSpec,
   WorkingDirectorySpec,
 } from '../domain/model.js';
+import { isLinkFreePath } from '../platform/path-safety.js';
 import type { OracleSpec } from '../oracle/index.js';
 import {
   GHOSTCASE_EXECUTION_DEPENDENCIES_SCHEMA,
@@ -320,7 +321,7 @@ async function inspectSuiteFile(
   if (
     !before.isFile() ||
     before.isSymbolicLink() ||
-    !samePath(absolutePath, canonical) ||
+    !(await isLinkFreePath(absolutePath, canonical)) ||
     !isWithin(suiteDir, canonical)
   ) {
     throw new EvidenceError(
@@ -423,10 +424,6 @@ function sameFileSnapshot(left: BigIntStats, right: BigIntStats): boolean {
 function isWithin(root: string, candidate: string): boolean {
   const child = relative(root, candidate);
   return child === '' || (!child.startsWith('..') && !isAbsolute(child));
-}
-
-function samePath(left: string, right: string): boolean {
-  return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
 function compareUtf8(left: string, right: string): number {

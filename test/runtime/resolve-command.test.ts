@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -112,7 +112,7 @@ describe('resolveCommand', () => {
       'agent.mjs',
       join(workspaceRoot(context), 'result.json'),
     ]);
-    expect(resolved.cwd).toBe(context.stateRoots.get('workspace'));
+    expect(resolved.cwd).toBe(await realpath(workspaceRoot(context)));
     expect(resolved.env).toMatchObject({
       CI: '1',
       GHOSTCASE: '1',

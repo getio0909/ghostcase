@@ -4,6 +4,7 @@ import { lstat, open, readdir, realpath } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 
 import { FixtureError } from '../domain/errors.js';
+import { isLinkFreePath } from '../platform/path-safety.js';
 
 export interface SeedLimits {
   readonly maxDepth: number;
@@ -47,7 +48,7 @@ export async function loadSeed(root: string, limits: SeedLimits): Promise<SeedSn
     throw new FixtureError('The seed root must be a regular directory.');
   }
   const canonicalRoot = await safeRealpath(lexicalRoot, 'seed root');
-  if (!samePath(lexicalRoot, canonicalRoot)) {
+  if (!(await isLinkFreePath(lexicalRoot, canonicalRoot))) {
     throw new FixtureError('The seed root resolves through a link or reparse point.');
   }
 
@@ -202,7 +203,7 @@ function addEntry(state: MutableLoadState, entry: SeedEntry, limits: SeedLimits)
 
 async function assertCanonicalEntry(canonicalRoot: string, path: string): Promise<void> {
   const canonical = await safeRealpath(path, 'seed entry');
-  if (!isContained(canonicalRoot, canonical) || !samePath(resolve(path), canonical)) {
+  if (!isContained(canonicalRoot, canonical) || !(await isLinkFreePath(resolve(path), canonical))) {
     throw new FixtureError('A seed entry resolves through a link or outside the seed root.');
   }
 }
@@ -270,10 +271,6 @@ function sameFileSnapshot(left: BigIntStats, right: BigIntStats): boolean {
 function isContained(root: string, candidate: string): boolean {
   const child = relative(root, candidate);
   return child === '' || (!child.startsWith('..') && !isAbsolute(child));
-}
-
-function samePath(left: string, right: string): boolean {
-  return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
 async function safeLstat(path: string, subject: string): Promise<BigIntStats> {

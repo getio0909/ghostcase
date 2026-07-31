@@ -61,7 +61,9 @@ GhostCase uses several fail-closed checks:
   limited to 64 MiB per file and 256 MiB total;
 - strict JSON rejects duplicate keys, unsafe values, and unknown schema fields;
 - known symbolic links and Windows junctions are rejected in fixtures and observed roots;
-- lexical paths and `realpath` values are compared at isolation boundaries;
+- lexical paths and `realpath` values are compared at isolation boundaries; when Windows expands
+  a DOS 8.3 alias, every lexical path component is checked for known links instead of treating the
+  harmless spelling change as a junction;
 - metadata and file identity are checked before, during, and after sensitive reads to narrow
   time-of-check/time-of-use races;
 - evidence and requested report files are created exclusively instead of overwriting existing
