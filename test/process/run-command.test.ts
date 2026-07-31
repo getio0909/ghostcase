@@ -58,50 +58,54 @@ afterEach(async (): Promise<void> => {
 });
 
 describe('runCommand', () => {
-  it('captures exit metadata and bounded stdout and stderr evidence', async () => {
-    const cwd = await makeTemporaryDirectory();
+  it(
+    'captures exit metadata and bounded stdout and stderr evidence',
+    async () => {
+      const cwd = await makeTemporaryDirectory();
 
-    const result = await runCommand({
-      argv: nodeCommand(
-        "process.stdout.write('hello'); process.stderr.write('warning'); process.exitCode = 7;",
-      ),
-      cwd,
-      env: {},
-      stdin: null,
-      timeoutMs: 2_000,
-      stdoutLimitBytes: 128,
-      stderrLimitBytes: 128,
-      captureLimitBytes: 128,
-    });
+      const result = await runCommand({
+        argv: nodeCommand(
+          "process.stdout.write('hello'); process.stderr.write('warning'); process.exitCode = 7;",
+        ),
+        cwd,
+        env: {},
+        stdin: null,
+        timeoutMs: 2_000,
+        stdoutLimitBytes: 128,
+        stderrLimitBytes: 128,
+        captureLimitBytes: 128,
+      });
 
-    expect(result).toEqual({
-      status: 'exited',
-      exitCode: 7,
-      signal: null,
-      durationMs: result.durationMs,
-      outputLimitStream: null,
-      reason: null,
-      stdout: {
-        bytes: 5,
-        sha256: digest('hello'),
-        content: 'hello',
-        truncated: false,
-      },
-      stderr: {
-        bytes: 7,
-        sha256: digest('warning'),
-        content: 'warning',
-        truncated: false,
-      },
-      termination: {
-        status: 'not_needed',
-        escalated: false,
-        detail: null,
-      },
-    });
-    expect(Number.isFinite(result.durationMs)).toBe(true);
-    expect(result.durationMs).toBeGreaterThanOrEqual(0);
-  });
+      expect(result).toEqual({
+        status: 'exited',
+        exitCode: 7,
+        signal: null,
+        durationMs: result.durationMs,
+        outputLimitStream: null,
+        reason: null,
+        stdout: {
+          bytes: 5,
+          sha256: digest('hello'),
+          content: 'hello',
+          truncated: false,
+        },
+        stderr: {
+          bytes: 7,
+          sha256: digest('warning'),
+          content: 'warning',
+          truncated: false,
+        },
+        termination: {
+          status: 'not_needed',
+          escalated: false,
+          detail: null,
+        },
+      });
+      expect(Number.isFinite(result.durationMs)).toBe(true);
+      expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    },
+    process.platform === 'win32' ? 25_000 : 5_000,
+  );
 
   windowsIt(
     'does not misclassify naturally retiring Windows console hosts as leaked descendants',

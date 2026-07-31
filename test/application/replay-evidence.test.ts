@@ -153,7 +153,7 @@ describe('replayEvidence', () => {
   ])(
     'rejects a stale recorded case reference',
     async ({ chain, victimId }) => {
-      const fixture = await replayFixture();
+      const fixture = await replayFixture({ useManualFinding: true });
       const recorded = fixture.report.victims[0];
       if (recorded?.fresh.kind !== 'stable' || recorded.shared.kind !== 'stable') {
         throw new Error('Replay fixture did not produce stable evidence.');
@@ -195,7 +195,7 @@ describe('replayEvidence', () => {
   ])(
     'rejects a recorded chain containing $label',
     async ({ chain }) => {
-      const fixture = await replayFixture();
+      const fixture = await replayFixture({ useManualFinding: true });
       const report = pollutionReport(fixture.report, chain);
       const stored = await storeEvidence({
         evidenceDir: join(fixture.root, `invalid-order-${chain.join('-')}`),
