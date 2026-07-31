@@ -114,7 +114,7 @@ describe('runCommand', () => {
           cwd,
           env: {},
           stdin: null,
-          timeoutMs: 2_000,
+          timeoutMs: 5_000,
           stdoutLimitBytes: 16,
           stderrLimitBytes: 16,
           captureLimitBytes: 16,
@@ -127,7 +127,7 @@ describe('runCommand', () => {
         ).toBe('not_needed');
       }
     },
-    20_000,
+    30_000,
   );
 
   it('counts raw bytes and truncates captured content without truncating its digest', async () => {

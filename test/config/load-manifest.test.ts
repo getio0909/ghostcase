@@ -535,6 +535,7 @@ describe('loadManifest', () => {
     const adapter = input.adapter as { run: Record<string, unknown> };
     adapter.run.program = { path: 'missing/tool.exe' };
     await writeFile(sourcePath, JSON.stringify(input));
+    const canonicalSuiteDir = dirname(await realpath(sourcePath));
 
     await expect(loadManifest(sourcePath)).resolves.toMatchObject({
       definition: {
@@ -546,7 +547,7 @@ describe('loadManifest', () => {
         {
           seed: {
             kind: 'copy',
-            resolvedPath: resolve(directory, 'fixtures', 'workspace'),
+            resolvedPath: resolve(canonicalSuiteDir, 'fixtures', 'workspace'),
           },
         },
         { seed: { kind: 'empty' } },

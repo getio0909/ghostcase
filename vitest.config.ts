@@ -8,6 +8,7 @@ export default defineConfig({
       reporter: ['text', 'json-summary'],
     },
     environment: 'node',
+    fileParallelism: process.platform !== 'win32',
     restoreMocks: true,
   },
 });

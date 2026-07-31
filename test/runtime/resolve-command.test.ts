@@ -330,7 +330,7 @@ describe('resolveCommand', () => {
         environment,
         context,
       ),
-    ).resolves.toMatchObject({ argv: [executable] });
+    ).resolves.toMatchObject({ argv: [await realpath(executable)] });
 
     const linkedName = process.platform === 'win32' ? 'linked.exe' : 'linked';
     try {

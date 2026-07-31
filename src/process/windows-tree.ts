@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
+import { lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { win32 } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
@@ -755,13 +756,7 @@ async function getWindowsTreeHelper(): Promise<WindowsTreeHelper> {
 function spawnHelper(): HelperChild {
   const windowsDirectory = process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows';
   const temporaryDirectory = win32.resolve(tmpdir());
-  const executable = win32.join(
-    windowsDirectory,
-    'System32',
-    'WindowsPowerShell',
-    'v1.0',
-    'powershell.exe',
-  );
+  const executable = resolvePowerShellExecutable(windowsDirectory);
   return spawn(
     executable,
     ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', WINDOWS_TREE_HELPER_SCRIPT],
@@ -778,6 +773,20 @@ function spawnHelper(): HelperChild {
       windowsHide: true,
     },
   );
+}
+
+function resolvePowerShellExecutable(windowsDirectory: string): string {
+  const systemRoot = win32.parse(windowsDirectory).root;
+  const modernPowerShell = win32.join(systemRoot, 'Program Files', 'PowerShell', '7', 'pwsh.exe');
+  try {
+    const metadata = lstatSync(modernPowerShell);
+    if (metadata.isFile() && !metadata.isSymbolicLink()) {
+      return modernPowerShell;
+    }
+  } catch {
+    // Windows PowerShell remains the dependency-free fallback.
+  }
+  return win32.join(windowsDirectory, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 }
 
 function parseHelperResult(message: string): WindowsExitedTreeCleanup {
